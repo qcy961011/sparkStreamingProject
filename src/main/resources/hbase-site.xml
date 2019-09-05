@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+<configuration>
+	<!--	Client参数	-->
+	<property>
+		<name>hbase.client.scanner.caching</name>
+		<value>10000</value>
+		<description>客户端参数，HBase scanner一次从服务端抓取的数据条数</description>
+	</property>
+
+	<property>
+		<name>hbase.client.scanner.timeout.period</name>
+		<value>900000</value>
+		<description>scanner过期时间</description>
+	</property>
+	<!--	Zookeeper	-->
+	<property>
+		<name>hbase.zookeeper.quorum</name>
+		<value>nn1.hadoop:2181,nn2.hadoop:2181,s1.hadoop:2181</value>
+	</property>
+
+	<property>
+		<name>zookeeper.session.timeout</name>
+		<value>1200000</value>
+	</property>
+
+</configuration>

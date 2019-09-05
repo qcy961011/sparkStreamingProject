@@ -1,0 +1,85 @@
+#hbase
+create 'context_extract',
+{NAME => 'i', VERSIONS => 1, BLOCKCACHE => true,COMPRESSION => 'SNAPPY'},
+{NAME => 'c', VERSIONS => 1, BLOCKCACHE => true,COMPRESSION => 'SNAPPY'},
+{NAME => 'h', VERSIONS => 1,COMPRESSION => 'SNAPPY'}
+
+
+#报表
+#mysql表结构
+CREATE TABLE `report_stream_extract` (
+  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT 'id',
+  `host` varchar(100) CHARACTER SET utf8 COLLATE utf8_bin NOT NULL COMMENT 'host地址',
+  `scan` bigint(20) NOT NULL DEFAULT '0' COMMENT '扫描数量',
+  `filtered` bigint(20) NOT NULL DEFAULT '0' COMMENT '过滤数量',
+  `extract` bigint(20) NOT NULL DEFAULT '0' COMMENT '抽取成功数量',
+  `empty_context` bigint(20) NOT NULL DEFAULT '0' COMMENT '空内容数量',
+  `no_match_xpath` bigint(20) NOT NULL DEFAULT '0' COMMENT '没有匹配到xpath数量',
+  `scan_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '第一次扫描时间',
+  `scan_day` int(11) NOT NULL DEFAULT '0' COMMENT '第一次扫描的时间天维度',
+  `scan_hour` int(11) NOT NULL DEFAULT '0' COMMENT '第一次扫描的时间小时纬度',
+  `hour_md5` varchar(255) CHARACTER SET utf8 COLLATE utf8_bin NOT NULL COMMENT '按扫描时间的小时生成md5值，用于按小时合并数据',
+  PRIMARY KEY (`host`,`hour_md5`) USING BTREE,
+  KEY `id` (`id`),
+  KEY `hour_md5` (`hour_md5`),
+  KEY `host` (`host`),
+  KEY `host_hour_md5` (`host`,`hour_md5`) USING BTREE,
+  KEY `scan_day` (`scan_day`),
+  KEY `scan_hour` (`scan_hour`),
+  KEY `scan_day_hour` (`scan_day`,`scan_hour`),
+  KEY `scan_day_host` (`scan_day`,`host`)
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+
+
+#人工配置表
+CREATE TABLE `stream_extract_xpath_rule`(
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `host` varchar(200) NOT NULL COMMENT '网站host',
+  `xpath` varchar(2000) NOT NULL COMMENT 'xpath规则',
+  `type` tinyint(2) NOT NULL COMMENT '类型:0正规则，1反规则',
+  `status` tinyint(2) NOT NULL DEFAULT '0' COMMENT '状态 0 启用 1 关闭',
+  `create_times` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
+  PRIMARY KEY (`id`),
+  KEY `host` (`host`),
+  KEY `host_status` (`host`,`status`)
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4;
+
+
+#ES使用java客户端创建的索引
+#索引重建,使用elasticsearch-dump
+elasticdump \
+  --input=http://s1.hadoop:9200/hainiu_spark \
+  --output=http://s1.hadoop:9200/hainiu_spark2 \
+  --type=data
+
+
+
+#该项目涉及的服务，按顺序启动
+zookeeper
+hadoop(yarn)
+hbase
+kafka
+kafka-manager
+redis-cluster
+python_crawler
+redis
+报表系统
+es(es-ik)
+es-head
+es-sql
+mysql
+spark-streaming
+crontab  python_xpath
+
+
+#集群运行命令，资源配置参数适合虚拟机，注意：集群和本地都要有相关的jar包
+spark-submit --driver-class-path /usr/local/spark/jars/*:/home/hadoop/spark_news_jars/* \
+--executor-memory 1G --num-executors 3 --executor-cores 1 --master yarn --queue hainiu \
+--files /usr/local/hbase/conf/hbase-site.xml \
+/home/hadoop/spark-extract-1.0-qingniu.jar newsextractstreaming
+
+#海牛集群运行命令
+nohup spark-submit --driver-class-path /usr/local/spark/jars/*:/home/qingniu/spark_news_jars/* \
+--executor-memory 2G --num-executors 24 --executor-cores 2 --driver-memory 3g --driver-cores 2 --master yarn --queue hainiu \
+--files /usr/local/hbase/conf/hbase-site.xml \
+/home/qingniu/spark-extract-1.0-qingniu.jar newsextractstreaming > /dev/null 2>&1 &
